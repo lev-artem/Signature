@@ -2,6 +2,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Threading;
 
 namespace Signature
@@ -76,7 +77,10 @@ namespace Signature
             {
                 Console.WriteLine($"{ex}, {ex.StackTrace}");
                 cancellationTokenSource.Cancel();
-                AutoResetEvent.WaitAll(completedEvents.ToArray(), TIMEOUT_TO_COMPLETE_ALL_CHILD_THREADS_MS);
+                if(completedEvents.Any())
+                {
+                    WaitHandle.WaitAll(completedEvents.ToArray(), TIMEOUT_TO_COMPLETE_ALL_CHILD_THREADS_MS);
+                }
             }
         }
     }
