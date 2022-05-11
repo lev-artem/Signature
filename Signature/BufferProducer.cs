@@ -63,38 +63,5 @@ namespace Signature
                 _cancellationTokenSource.Cancel();
             }
         }
-
-        public void Run1()
-        {
-            try
-            {
-                using (var fileStream = File.OpenRead(_filePath))
-                {
-                    using (var hashCoder = SHA256.Create())
-                    {
-                        var i = 0;
-                        var buffer = new byte[_bufferLenght];
-                        while (fileStream.Read(buffer, 0, _bufferLenght) > 0)
-                        {
-                            //_fileBlocksOutput.Add((i, (byte[])buffer.Clone()), _cancelationTokenSource.Token);
-                            i++;
-                            byte[] result = hashCoder.ComputeHash(buffer);
-                            var hashCode = Encoding.Default.GetString(result);
-                            Console.WriteLine($"{i} {hashCode}");
-                        }
-                        _fileBlocksOutput.CompleteAdding();
-                    }
-                }
-            }
-            catch (OperationCanceledException ex)
-            {
-                Console.WriteLine(ex.Message);
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex.Message);
-                _cancellationTokenSource.Cancel();
-            }
-        }
     }
 }
