@@ -19,13 +19,13 @@ namespace Signature
         {
             if(bufferLength <= 0)
             {
-                throw new ArgumentOutOfRangeException(nameof(bufferLength));
+                throw new ArgumentOutOfRangeException(nameof(bufferLength), bufferLength, "cannot be less or equal to 0");
             }
             _bufferLenght = bufferLength;
 
             if (string.IsNullOrWhiteSpace(filePath))
             {
-                throw new ArgumentOutOfRangeException(nameof(filePath));
+                throw new ArgumentOutOfRangeException(nameof(filePath), filePath, "cannot be null, empty or whitespace");
             }
             _filePath = filePath;
 

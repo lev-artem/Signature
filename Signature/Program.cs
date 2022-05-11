@@ -8,7 +8,8 @@ namespace Signature
 {
     class Program
     {
-        const int  BOUNDED_QUEUE_CAPACITY = 4096;
+        const int BOUNDED_QUEUE_CAPACITY = 4096;
+        const int BUFFER_PRODUCER_AND_HASH_CONSUMER_THREAD_COUNT = 2;
 
         static void Main(string[] args)
         {
@@ -27,7 +28,7 @@ namespace Signature
                 var blockSize = int.Parse(args[1]); 
                 if(blockSize <= 0)
                 {
-                    throw new ArgumentOutOfRangeException("Block size specified in arg1 cannot be less or equal to 0");
+                    throw new ArgumentOutOfRangeException(nameof(blockSize), blockSize, "block size specified in arg1 cannot be less or equal to 0");
                 }
                 var fileLength = new FileInfo(filePath).Length;
                 var fileBlockCount = fileLength / blockSize;
@@ -40,16 +41,15 @@ namespace Signature
                 var producer = new BufferProducer(fileBlockCollection, filePath, blockSize, cancellationTokenSource);
                 var producerThread = new Thread(producer.Run);
 
-                var threads = new List<Thread>
+                var threads = new List<Thread>()
                 {
                     producerThread
                 };
 
                 var hashCodeCollection = new BlockingCollection<(int Number, string HashCode)>(BOUNDED_QUEUE_CAPACITY);
-                /// 2 is one thread for BufferProducer and one thread for HashConsumer and rest threads for BufferConsumerHashProducer
-                var producerConsumerCount = Math.Max(1, Environment.ProcessorCount - 2);
+                var consumerProducerThreadCount = Math.Max(1, Environment.ProcessorCount - BUFFER_PRODUCER_AND_HASH_CONSUMER_THREAD_COUNT);
                 
-                for(int i = 0; i < producerConsumerCount; i++)
+                for(int i = 0; i < consumerProducerThreadCount; i++)
                 {
                     var consumerProducer = new BufferConsumerHashProducer(fileBlockCollection, hashCodeCollection, cancellationTokenSource);
                     var consumerProducerThread = new Thread(consumerProducer.Run);
@@ -66,7 +66,7 @@ namespace Signature
             catch(Exception ex)
             {
                 Console.WriteLine($"{ex}, {ex.StackTrace}");
-                cancellationTokenSource.Cancel();
+                cancellationTokenSource.Cancel();       
             }
         }
     }

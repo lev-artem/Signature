@@ -13,6 +13,10 @@ namespace Signature
 
         public HashConsumer(BlockingCollection<(int number, string hashCode)> hashCodeInput, long blockCount, CancellationTokenSource cancellationTokenSource)
         {
+            if (blockCount <= 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(blockCount), blockCount, "cannot be less or equal to 0");
+            }
             _hashCodeDict = new Dictionary<int, string>((int)blockCount);
             _hashCodeInput = hashCodeInput ?? throw new ArgumentNullException(nameof(hashCodeInput));
             _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
@@ -28,6 +32,10 @@ namespace Signature
                 }
                 foreach (var hashCodeBlock in _hashCodeDict)
                 {
+                    if (_cancellationTokenSource.IsCancellationRequested)
+                    {
+                        return;
+                    }
                     Console.WriteLine($"{hashCodeBlock.Key} {hashCodeBlock.Value}");
                 }
             }
