@@ -12,10 +12,11 @@ namespace Signature
         private readonly string _filePath;
         private readonly int _bufferLenght;
 
+        private readonly AutoResetEvent _completedEvent;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly BlockingCollection<(int number, byte[] buffer)> _fileBlocksOutput;
 
-        public BufferProducer(BlockingCollection<(int number, byte[] buffer)> fileBlocksOutput, string filePath, int bufferLength, CancellationTokenSource cancellationTokenSource)
+        public BufferProducer(BlockingCollection<(int number, byte[] buffer)> fileBlocksOutput, string filePath, int bufferLength, CancellationTokenSource cancellationTokenSource, AutoResetEvent completedEvent)
         {
             if(bufferLength <= 0)
             {
@@ -28,7 +29,7 @@ namespace Signature
                 throw new ArgumentOutOfRangeException(nameof(filePath), filePath, "cannot be null, empty or whitespace");
             }
             _filePath = filePath;
-
+            _completedEvent = completedEvent ?? throw new ArgumentNullException(nameof(completedEvent));
             _fileBlocksOutput = fileBlocksOutput ?? throw new ArgumentNullException(nameof(fileBlocksOutput));
             _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
         }
@@ -61,6 +62,10 @@ namespace Signature
             {
                 Console.WriteLine($"{ex}, {ex.StackTrace}");
                 _cancellationTokenSource.Cancel();
+            }
+            finally
+            {
+                _completedEvent.Set();
             }
         }
     }

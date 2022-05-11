@@ -10,10 +10,12 @@ namespace Signature
     {
         const int BOUNDED_QUEUE_CAPACITY = 4096;
         const int BUFFER_PRODUCER_AND_HASH_CONSUMER_THREAD_COUNT = 2;
+        const int TIMEOUT_TO_COMPLETE_ALL_CHILD_THREADS_MS = 1000;
 
         static void Main(string[] args)
         {
             var cancellationTokenSource = new CancellationTokenSource();
+            var completedEvents = new List<AutoResetEvent>();
             try
             {
                 if (args == null || args.Length != 2)
@@ -37,8 +39,11 @@ namespace Signature
                     fileBlockCount++;
                 }
 
+                var producerCompletedEvent = new AutoResetEvent(false);
+                completedEvents.Add(producerCompletedEvent);
+
                 var fileBlockCollection = new BlockingCollection<(int Number, byte[] Buffer)>(BOUNDED_QUEUE_CAPACITY);
-                var producer = new BufferProducer(fileBlockCollection, filePath, blockSize, cancellationTokenSource);
+                var producer = new BufferProducer(fileBlockCollection, filePath, blockSize, cancellationTokenSource, producerCompletedEvent);
                 var producerThread = new Thread(producer.Run);
 
                 var threads = new List<Thread>()
@@ -51,12 +56,16 @@ namespace Signature
                 
                 for(int i = 0; i < consumerProducerThreadCount; i++)
                 {
-                    var consumerProducer = new BufferConsumerHashProducer(fileBlockCollection, hashCodeCollection, cancellationTokenSource);
+                    var consumerProducerCompletedEvent = new AutoResetEvent(false);
+                    completedEvents.Add(consumerProducerCompletedEvent);
+                    var consumerProducer = new BufferConsumerHashProducer(fileBlockCollection, hashCodeCollection, cancellationTokenSource, consumerProducerCompletedEvent);
                     var consumerProducerThread = new Thread(consumerProducer.Run);
                     threads.Add(consumerProducerThread);
                 }
-                
-                var hashConsumer = new HashConsumer(hashCodeCollection, fileBlockCount, cancellationTokenSource);
+
+                var hashConsumerCompletedEvent = new AutoResetEvent(false);
+                completedEvents.Add(hashConsumerCompletedEvent);
+                var hashConsumer = new HashConsumer(hashCodeCollection, fileBlockCount, cancellationTokenSource, hashConsumerCompletedEvent);
                 var hashConsumerThread = new Thread(hashConsumer.Run);
                 threads.Add(hashConsumerThread);
 
@@ -66,7 +75,8 @@ namespace Signature
             catch(Exception ex)
             {
                 Console.WriteLine($"{ex}, {ex.StackTrace}");
-                cancellationTokenSource.Cancel();       
+                cancellationTokenSource.Cancel();
+                AutoResetEvent.WaitAll(completedEvents.ToArray(), TIMEOUT_TO_COMPLETE_ALL_CHILD_THREADS_MS);
             }
         }
     }

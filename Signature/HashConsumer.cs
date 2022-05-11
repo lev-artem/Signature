@@ -7,11 +7,12 @@ namespace Signature
 {
     public class HashConsumer
     {
+        private readonly AutoResetEvent _completedEvent;
         private readonly Dictionary<int, string> _hashCodeDict;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly BlockingCollection<(int number, string hashCode)> _hashCodeInput;
 
-        public HashConsumer(BlockingCollection<(int number, string hashCode)> hashCodeInput, long blockCount, CancellationTokenSource cancellationTokenSource)
+        public HashConsumer(BlockingCollection<(int number, string hashCode)> hashCodeInput, long blockCount, CancellationTokenSource cancellationTokenSource, AutoResetEvent completedEvent)
         {
             if (blockCount <= 0)
             {
@@ -19,6 +20,7 @@ namespace Signature
             }
             _hashCodeDict = new Dictionary<int, string>((int)blockCount);
             _hashCodeInput = hashCodeInput ?? throw new ArgumentNullException(nameof(hashCodeInput));
+            _completedEvent = completedEvent ?? throw new ArgumentNullException(nameof(completedEvent));
             _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
         }
 
@@ -47,6 +49,10 @@ namespace Signature
             {
                 Console.WriteLine($"{ex}, {ex.StackTrace}");
                 _cancellationTokenSource.Cancel();
+            }
+            finally
+            {
+                _completedEvent.Set();
             }
         }
     }
