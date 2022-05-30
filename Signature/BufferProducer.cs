@@ -44,18 +44,15 @@ namespace Signature
             {
                 using (var fileStream = File.OpenRead(_filePath))
                 {
-                    using (var hashCoder = SHA256.Create())
+                    var i = 0;
+                    var buffer = _bufferPool.Rent(_bufferLenght);
+                    while (fileStream.Read(buffer, 0, _bufferLenght) > 0)
                     {
-                        var i = 0;
-                        var buffer = _bufferPool.Rent(_bufferLenght);
-                        while (fileStream.Read(buffer, 0, _bufferLenght) > 0)
-                        {
-                            _fileBlocksOutput.Add((i, buffer), _cancellationTokenSource.Token);
-                            buffer = _bufferPool.Rent(_bufferLenght);
-                            i++;
-                        }
-                        _fileBlocksOutput.CompleteAdding();
+                        _fileBlocksOutput.Add((i, buffer), _cancellationTokenSource.Token);
+                        buffer = _bufferPool.Rent(_bufferLenght);
+                        i++;
                     }
+                    _fileBlocksOutput.CompleteAdding();                  
                 }
             }
             catch (OperationCanceledException ex)
