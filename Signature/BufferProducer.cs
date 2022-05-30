@@ -1,8 +1,8 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Security.Cryptography;
-using System.Text;
 using System.Threading;
 
 namespace Signature
@@ -12,11 +12,12 @@ namespace Signature
         private readonly string _filePath;
         private readonly int _bufferLenght;
 
+        private readonly ArrayPool<byte> _bufferPool;
         private readonly AutoResetEvent _completedEvent;
         private readonly CancellationTokenSource _cancellationTokenSource;
         private readonly BlockingCollection<(int number, byte[] buffer)> _fileBlocksOutput;
 
-        public BufferProducer(BlockingCollection<(int number, byte[] buffer)> fileBlocksOutput, string filePath, int bufferLength, CancellationTokenSource cancellationTokenSource, AutoResetEvent completedEvent)
+        public BufferProducer(BlockingCollection<(int number, byte[] buffer)> fileBlocksOutput, ArrayPool<byte> bufferPool, string filePath, int bufferLength, AutoResetEvent completedEvent, CancellationTokenSource cancellationTokenSource)
         {
             if(bufferLength <= 0)
             {
@@ -29,6 +30,8 @@ namespace Signature
                 throw new ArgumentOutOfRangeException(nameof(filePath), filePath, "cannot be null, empty or whitespace");
             }
             _filePath = filePath;
+
+            _bufferPool = bufferPool ?? throw new ArgumentNullException(nameof(bufferPool));
             _completedEvent = completedEvent ?? throw new ArgumentNullException(nameof(completedEvent));
             _fileBlocksOutput = fileBlocksOutput ?? throw new ArgumentNullException(nameof(fileBlocksOutput));
             _cancellationTokenSource = cancellationTokenSource ?? throw new ArgumentNullException(nameof(cancellationTokenSource));
@@ -44,10 +47,11 @@ namespace Signature
                     using (var hashCoder = SHA256.Create())
                     {
                         var i = 0;
-                        var buffer = new byte[_bufferLenght];
+                        var buffer = _bufferPool.Rent(_bufferLenght);
                         while (fileStream.Read(buffer, 0, _bufferLenght) > 0)
                         {
-                            _fileBlocksOutput.Add((i, (byte[])buffer.Clone()), _cancellationTokenSource.Token);
+                            _fileBlocksOutput.Add((i, buffer), _cancellationTokenSource.Token);
+                            buffer = _bufferPool.Rent(_bufferLenght);
                             i++;
                         }
                         _fileBlocksOutput.CompleteAdding();

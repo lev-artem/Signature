@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
@@ -9,8 +10,7 @@ namespace Signature
 {
     class Program
     {
-        const int BOUNDED_QUEUE_CAPACITY = 4096;
-        const int BUFFER_PRODUCER_AND_HASH_CONSUMER_THREAD_COUNT = 2;
+        const int BUFFER_PRODUCER_THREAD_COUNT = 1;
         const int TIMEOUT_TO_COMPLETE_ALL_CHILD_THREADS_MS = 1000;
 
         static void Main(string[] args)
@@ -43,8 +43,10 @@ namespace Signature
                 var producerCompletedEvent = new AutoResetEvent(false);
                 completedEvents.Add(producerCompletedEvent);
 
-                var fileBlockCollection = new BlockingCollection<(int Number, byte[] Buffer)>(BOUNDED_QUEUE_CAPACITY);
-                var producer = new BufferProducer(fileBlockCollection, filePath, blockSize, cancellationTokenSource, producerCompletedEvent);
+                var boundedQueueCapacity = Environment.ProcessorCount;
+                var bufferPool = ArrayPool<byte>.Create(blockSize, boundedQueueCapacity);
+                var fileBlockCollection = new BlockingCollection<(int Number, byte[] Buffer)>(boundedQueueCapacity);
+                var producer = new BufferProducer(fileBlockCollection, bufferPool, filePath, blockSize, producerCompletedEvent, cancellationTokenSource);
                 var producerThread = new Thread(producer.Run);
 
                 var threads = new List<Thread>()
@@ -52,23 +54,17 @@ namespace Signature
                     producerThread
                 };
 
-                var hashCodeCollection = new BlockingCollection<(int Number, string HashCode)>(BOUNDED_QUEUE_CAPACITY);
-                var consumerProducerThreadCount = Math.Max(1, Environment.ProcessorCount - BUFFER_PRODUCER_AND_HASH_CONSUMER_THREAD_COUNT);
+                var consumerThreadCount = Math.Max(1, Environment.ProcessorCount - BUFFER_PRODUCER_THREAD_COUNT);
+                var writer = new ThreadSafeConsoleWriter(boundedQueueCapacity, fileBlockCount);
                 
-                for(int i = 0; i < consumerProducerThreadCount; i++)
+                for(int i = 0; i < consumerThreadCount; i++)
                 {
-                    var consumerProducerCompletedEvent = new AutoResetEvent(false);
-                    completedEvents.Add(consumerProducerCompletedEvent);
-                    var consumerProducer = new BufferConsumerHashProducer(fileBlockCollection, hashCodeCollection, cancellationTokenSource, consumerProducerCompletedEvent);
-                    var consumerProducerThread = new Thread(consumerProducer.Run);
-                    threads.Add(consumerProducerThread);
+                    var consumerCompletedEvent = new AutoResetEvent(false);
+                    completedEvents.Add(consumerCompletedEvent);
+                    var consumerProducer = new BufferConsumer(fileBlockCollection, bufferPool, writer, consumerCompletedEvent, cancellationTokenSource);
+                    var consumerThread = new Thread(consumerProducer.Run);
+                    threads.Add(consumerThread);
                 }
-
-                var hashConsumerCompletedEvent = new AutoResetEvent(false);
-                completedEvents.Add(hashConsumerCompletedEvent);
-                var hashConsumer = new HashConsumer(hashCodeCollection, fileBlockCount, cancellationTokenSource, hashConsumerCompletedEvent);
-                var hashConsumerThread = new Thread(hashConsumer.Run);
-                threads.Add(hashConsumerThread);
 
                 threads.ForEach(thread => thread.Start());
                 threads.ForEach(thread => thread.Join());
