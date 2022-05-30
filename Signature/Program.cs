@@ -61,8 +61,8 @@ namespace Signature
                 {
                     var consumerCompletedEvent = new AutoResetEvent(false);
                     completedEvents.Add(consumerCompletedEvent);
-                    var consumerProducer = new BufferConsumer(fileBlockCollection, bufferPool, writer, consumerCompletedEvent, cancellationTokenSource);
-                    var consumerThread = new Thread(consumerProducer.Run);
+                    var consumer = new BufferConsumer(fileBlockCollection, bufferPool, writer, consumerCompletedEvent, cancellationTokenSource);
+                    var consumerThread = new Thread(consumer.Run);
                     threads.Add(consumerThread);
                 }
 
