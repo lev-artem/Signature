@@ -43,9 +43,9 @@ namespace Signature
                 var producerCompletedEvent = new AutoResetEvent(false);
                 completedEvents.Add(producerCompletedEvent);
 
-                var boundedQueueCapacity = Environment.ProcessorCount;
-                var bufferPool = ArrayPool<byte>.Create(blockSize, boundedQueueCapacity);
-                var fileBlockCollection = new BlockingCollection<(int Number, byte[] Buffer)>(boundedQueueCapacity);
+                var taskCount = Environment.ProcessorCount;
+                var bufferPool = ArrayPool<byte>.Create(blockSize, taskCount);
+                var fileBlockCollection = new BlockingCollection<(int Number, byte[] Buffer)>(taskCount);
                 var producer = new BufferProducer(fileBlockCollection, bufferPool, filePath, blockSize, producerCompletedEvent, cancellationTokenSource);
                 var producerThread = new Thread(producer.Run);
 
@@ -55,7 +55,7 @@ namespace Signature
                 };
 
                 var consumerThreadCount = Math.Max(1, Environment.ProcessorCount - BUFFER_PRODUCER_THREAD_COUNT);
-                var writer = new ThreadSafeConsoleWriter(boundedQueueCapacity, fileBlockCount);
+                var writer = new ThreadSafeConsoleWriter(taskCount, fileBlockCount);
                 
                 for(int i = 0; i < consumerThreadCount; i++)
                 {
